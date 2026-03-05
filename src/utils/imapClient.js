@@ -164,10 +164,17 @@ function fetchEmails(config) {
         });
 
         fetch.once('end', async () => {
-          console.log('[fetch-emails] fetch end, parsed emails:', emails.length);
+          console.log('[fetch-emails] fetch on end, current emails array length:', emails.length);
           try {
             await Promise.all(parsePromises);
-            console.log('[fetch-emails] parse completed');
+            console.log('[fetch-emails] parse all completed, total emails in array:', emails.length);
+            if (emails.length > 0) {
+              console.log('[fetch-emails] Sample email:', {
+                id: emails[0].id,
+                messageId: emails[0].messageId,
+                subject: emails[0].subject?.substring(0, 50)
+              });
+            }
           } catch (e) {
             console.error('[fetch-emails] parse error:', e);
           }
