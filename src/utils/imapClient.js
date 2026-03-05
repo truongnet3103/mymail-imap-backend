@@ -1,5 +1,6 @@
 const Imap = require('imap');
 const { simpleParser } = require('mailparser');
+const { db } = require('../firebase/admin');
 
 function stripHtml(html) {
   if (!html) return '';
@@ -94,16 +95,9 @@ function testConnection(config) {
 
 function fetchEmails(config) {
   return new Promise((resolve, reject) => {
+    console.log('[fetch-emails] called with config:', { ...config, password: '***' });
+    console.log('[fetch-emails] db instance:', db ? 'ok' : 'null');
     const { user, password, host, port, folder = 'INBOX', limit = 20 } = config;
-
-    const imap = new Imap({
-      user, password, host,
-      port: parseInt(port) || 993,
-      tls: true,
-      tlsOptions: { rejectUnauthorized: false },
-      authTimeout: 10000,
-      connTimeout: 15000
-    });
 
     const emails = [];
     const parsePromises = [];
@@ -170,11 +164,47 @@ function fetchEmails(config) {
         });
 
         fetch.once('end', async () => {
+          console.log('[fetch-emails] fetch end, parsed emails:', emails.length);
           try {
             await Promise.all(parsePromises);
+            console.log('[fetch-emails] parse completed');
           } catch (e) {
-            console.error('Parse promise error:', e);
+            console.error('[fetch-emails] parse error:', e);
           }
+          
+          // Save emails to Firestore (deduplicate by messageId)
+          if (emails.length > 0) {
+            console.log('[fetch-emails] Starting Firestore save');
+            try {
+              const userId = 'default-user-id';
+              let savedCount = 0;
+              let skippedCount = 0;
+              for (const email of emails) {
+                const docId = email.messageId || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                console.log('[fetch-emails] Saving email:', docId, 'subject:', email.subject?.substring(0, 50));
+                const docRef = db.collection('emails').doc(docId);
+                const existing = await docRef.get();
+                if (!existing.exists) {
+                  await docRef.set({
+                    ...email,
+                    userId: userId,
+                    fetchedAt: new Date().toISOString()
+                  });
+                  savedCount++;
+                  console.log('[Firestore] Saved email:', docId);
+                } else {
+                  skippedCount++;
+                  console.log('[Firestore] Email exists, skip:', docId);
+                }
+              }
+              console.log(`[fetch-emails] Firestore save complete: ${savedCount} saved, ${skippedCount} skipped`);
+            } catch (e) {
+              console.error('[Firestore] Save error:', e);
+            }
+          } else {
+            console.log('[fetch-emails] No emails to save');
+          }
+          
           if (!done) {
             done = true;
             imap.end();

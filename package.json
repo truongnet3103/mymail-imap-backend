@@ -3,9 +3,7 @@
   "version": "1.0.0",
   "description": "MyMail IMAP Backend - Vercel Functions",
   "dependencies": {
-    "axios": "^1.13.6",
     "firebase-admin": "^11.11.1",
-    "google-generativeai": "^0.10.0",
     "imap": "^0.8.19",
     "mailparser": "^3.6.5"
   }
