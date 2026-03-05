@@ -61,11 +61,20 @@ function cleanEmailBody(text) {
     /88D Duong Cong Khi/i,
     /Contact:/i,
     /Tel:/i,
+    /Mobile:/i,
     /Fax:/i,
     /Email:/i,
     /Website:/i,
-    /^\d{1,2}[A-Za-z]{3,} \d{6,}/, // Address pattern like "88D Duong..."
-    /^\d{1,2}[A-Za-z]{3,} \d+$/,
+    /URL:/i,
+    /Group email:/i,
+    /TAX CODE/i,
+    /VAT CODE/i,
+    /Add(?:ress)?:/i,
+    /^\d{1,2}[A-Za-z]{3,} \d{6,}/i, // Address like "88D Duong..."
+    /^\d{1,2}[A-Za-z]{3,} \d+$/i,
+    /^\d{1,2}[A-Za-z]{3,},? \d+$/i,
+    /^[A-Za-z0-9\s]+,\s*[A-Za-z\s]+$/i, // generic address line
+    /^[A-Z]{2,}\s+[A-Za-z\s]+$/i, // uppercase words (company name)
   ];
 
   let foundStop = false;
