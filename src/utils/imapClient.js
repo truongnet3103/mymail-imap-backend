@@ -15,38 +15,63 @@ function stripHtml(html) {
 function cleanEmailBody(text) {
   if (!text) return '';
   
-  // Split by common quoted reply delimiters
-  const delimiters = [
-    /^From:.*$/im,
-    /^Sent:.*$/im,
-    /^To:.*$/im,
-    /^Subject:.*$/im,
-    /^On.*wrote:$/im,
-    /^---+\s*Original Message\s*---/im,
-    /^>+/, // quoted lines starting with >
-    /^_{3,}$/im, // separator lines (___)
-    /^[-*]{3,}$/im,
-    /^--\s*$/im,
-    /^\[img\]/i,
-    /^\[cid:/i
+  const lines = text.split('\n');
+  const result = [];
+  let inQuotedBlock = false;
+  let inSignature = false;
+
+  // Patterns that indicate start of quoted content or metadata
+  const quotedStartPatterns = [
+    /^On\s.+wrote:?$/i,           // "On Mon, ... wrote:"
+    /^From:\s+/i,                 // "From: name <email>"
+    /^Sent:\s+/i,                 // "Sent: Monday, ..."
+    /^To:\s+/i,                   // "To: ..."
+    /^Cc:\s+/i,                   // "Cc: ..."
+    /^Subject:\s+/i,              // "Subject: ..."
+    /^Date:\s+/i,                 // "Date: ..."
+    /^---+$/m,                    // "---"
+    /^_{3,}$/m,                   // "___"
+    /^[*]{3,}$/m,                // "***"
+    /^--\s*$/m,                   // "--"
+    /^Original Message$/i,        // "Original Message"
+    /^\[img\]/i,                  // "[img]"
+    /^\[cid:/i                    // "[cid:...]"
   ];
 
-  let lines = text.split('\n');
-  let result = [];
-  let skip = false;
+  // Check if line is part of a signature (after '-- ')
+  const signaturePattern = /^--\s*$/;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
+    let line = lines[i];
 
-    // Check if line matches any delimiter
-    if (delimiters.some(re => re.test(line))) {
-      skip = true;
-      break; // stop at first delimiter
+    // Check for signature delimiter
+    if (signaturePattern.test(line.trim())) {
+      inSignature = true;
+      continue;
     }
 
-    // Skip empty lines at start
-    if (result.length === 0 && !trimmed) continue;
+    // Skip everything after signature
+    if (inSignature) continue;
+
+    // Check for quoted block start (lines beginning with '>')
+    if (/^>\s?/.test(line)) {
+      inQuotedBlock = true;
+      continue;
+    }
+
+    // If we are in a quoted block, skip until we hit a non-quoted line? 
+    // Actually once we see a quoted line, we stop entirely because it's usually at the end anyway.
+    if (inQuotedBlock) {
+      break;
+    }
+
+    // Check for metadata headers that indicate forwarded content
+    if (quotedStartPatterns.some(re => re.test(line))) {
+      break; // stop including further content
+    }
+
+    // Skip empty lines at the very beginning (leading whitespace)
+    if (result.length === 0 && line.trim() === '') continue;
 
     result.push(line);
   }
