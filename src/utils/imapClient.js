@@ -102,6 +102,15 @@ function fetchEmails(config) {
     console.log('[fetch-emails] db instance:', db ? 'ok' : 'null');
     const { user, password, host, port, folder = 'INBOX', limit = 20 } = config;
 
+    const imap = new Imap({
+      user, password, host,
+      port: parseInt(port) || 993,
+      tls: true,
+      tlsOptions: { rejectUnauthorized: false },
+      authTimeout: 10000,
+      connTimeout: 15000
+    });
+
     const emails = [];
     const parsePromises = [];
     let done = false;
@@ -261,5 +270,6 @@ module.exports = { testConnection, fetchEmails };
 
 
 
-.  
+. 
+ 
  
