@@ -19,8 +19,14 @@ module.exports = async (req, res) => {
     return res.status(400).json({ success: false, errors });
   }
 
+  // Log incoming request (truncate password)
+  const logBody = { ...req.body };
+  if (logBody.password) logBody.password = '***';
+  console.log('IMAP test request:', JSON.stringify(logBody));
+
   try {
     const result = await testConnection(req.body);
+    console.log('IMAP test result:', result);
     return res.status(200).json(result);
   } catch (err) {
     console.error('IMAP test error:', err);
