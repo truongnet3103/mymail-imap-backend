@@ -113,6 +113,7 @@ function fetchEmails(config) {
 
     const emails = [];
     const parsePromises = [];
+    let messagesExpected = 0;
     let done = false;
 
     imap.once('ready', () => {
@@ -136,15 +137,16 @@ function fetchEmails(config) {
         }
 
         const fetchCount = Math.min(parseInt(limit), box.messages.total);
+        messagesExpected = fetchCount;
         const fetch = imap.seq.fetch(`${box.messages.total - fetchCount + 1}:${box.messages.total}`, { bodies: '' });
 
         fetch.on('message', (msg) => {
-          let buffer = '';
-          msg.on('body', (stream) => {
-            stream.on('data', (chunk) => buffer += chunk.toString());
-          });
-
           const p = new Promise((resolveParse) => {
+            let buffer = '';
+            msg.on('body', (stream) => {
+              stream.on('data', (chunk) => buffer += chunk.toString());
+            });
+
             msg.once('end', async () => {
               try {
                 const parsed = await simpleParser(buffer, {
@@ -165,6 +167,7 @@ function fetchEmails(config) {
                   date: parsed.date?.toISOString() || new Date().toISOString(),
                   messageId: parsed.messageId
                 });
+                console.log('[parse] completed email:', emails.length, '/', messagesExpected, '-', parsed.subject?.substring(0, 30));
               } catch (e) {
                 console.error('Parse error:', e.message);
               } finally {
@@ -176,21 +179,15 @@ function fetchEmails(config) {
         });
 
         fetch.once('end', async () => {
-          console.log('[fetch-emails] fetch on end, current emails array length:', emails.length);
+          console.log('[fetch-emails] fetch end event, waiting for', messagesExpected, 'messages to parse');
           try {
+            // Wait for all parse promises to complete
             await Promise.all(parsePromises);
-            console.log('[fetch-emails] parse all completed, total emails in array:', emails.length);
-            if (emails.length > 0) {
-              console.log('[fetch-emails] Sample email:', {
-                id: emails[0].id,
-                messageId: emails[0].messageId,
-                subject: emails[0].subject?.substring(0, 50)
-              });
-            }
+            console.log('[fetch-emails] all parse promises resolved, total emails:', emails.length);
           } catch (e) {
             console.error('[fetch-emails] parse error:', e);
           }
-          
+
           // Save emails to Firestore using batch write with upsert (merge: true)
           if (emails.length > 0) {
             console.log('[fetch-emails] Starting Firestore batch save (upsert)');
@@ -228,7 +225,7 @@ function fetchEmails(config) {
           } else {
             console.log('[fetch-emails] No emails to save');
           }
-          
+
           if (!done) {
             done = true;
             imap.end();
