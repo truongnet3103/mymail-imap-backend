@@ -2,6 +2,9 @@ const { fetchEmails } = require('../src/utils/imapClient');
 const { validateImapFetch } = require('../src/utils/validators');
 
 module.exports = async (req, res) => {
+  console.log('[fetch-emails] Request received:', new Date().toISOString());
+  console.log('[fetch-emails] Body:', JSON.stringify(req.body));
+
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
