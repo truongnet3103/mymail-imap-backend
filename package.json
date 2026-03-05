@@ -1,0 +1,9 @@
+{
+  "name": "mymail-backend",
+  "version": "1.0.0",
+  "description": "MyMail IMAP Backend - Vercel Functions",
+  "dependencies": {
+    "imap": "^0.8.19",
+    "mailparser": "^3.6.5"
+  }
+}
