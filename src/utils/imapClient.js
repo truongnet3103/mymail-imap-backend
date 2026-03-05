@@ -191,32 +191,40 @@ function fetchEmails(config) {
             console.error('[fetch-emails] parse error:', e);
           }
           
-          // Save emails to Firestore (deduplicate by messageId)
+          // Save emails to Firestore using batch write (deduplicate by messageId)
           if (emails.length > 0) {
-            console.log('[fetch-emails] Starting Firestore save');
+            console.log('[fetch-emails] Starting Firestore batch save');
             try {
               const userId = 'default-user-id';
+              const batch = db.batch();
               let savedCount = 0;
               let skippedCount = 0;
+
               for (const email of emails) {
-                const docId = email.messageId || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                console.log('[fetch-emails] Saving email:', docId, 'subject:', email.subject?.substring(0, 50));
+                // Sanitize messageId for Firestore document ID
+                let docId = email.messageId || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                if (docId) {
+                  docId = docId.replace(/[<>]/g, '').replace(/[\/#?]/g, '');
+                }
                 const docRef = db.collection('emails').doc(docId);
+
+                // Check existence (still need read, but batch write reduces writes)
                 const existing = await docRef.get();
                 if (!existing.exists) {
-                  await docRef.set({
+                  batch.set(docRef, {
                     ...email,
                     userId: userId,
                     fetchedAt: new Date().toISOString()
                   });
                   savedCount++;
-                  console.log('[Firestore] Saved email:', docId);
+                  console.log('[Firestore] Queued email for batch:', docId);
                 } else {
                   skippedCount++;
-                  console.log('[Firestore] Email exists, skip:', docId);
                 }
               }
-              console.log(`[fetch-emails] Firestore save complete: ${savedCount} saved, ${skippedCount} skipped`);
+
+              await batch.commit();
+              console.log(`[fetch-emails] Firestore batch save complete: ${savedCount} saved, ${skippedCount} skipped`);
             } catch (e) {
               console.error('[Firestore] Save error:', e);
             }
