@@ -136,7 +136,10 @@ function fetchEmails(config) {
                 }
                 cleanBody = cleanEmailBody(cleanBody);
                 // Safely extract fields without optional chaining
-                const fromText = (parsed.from && parsed.from.text) ? parsed.from.text : '';
+                let fromText = '';
+                if (parsed.from) {
+                  fromText = parsed.from.address ? parsed.from.address : (parsed.from.text || '');
+                }
                 const subject = parsed.subject || '';
                 const date = (parsed.date && typeof parsed.date.toISOString === 'function') ? parsed.date.toISOString() : new Date().toISOString();
                 const messageId = parsed.messageId || '';

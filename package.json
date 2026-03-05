@@ -5,6 +5,7 @@
   "dependencies": {
     "firebase-admin": "^11.11.1",
     "imap": "^0.8.19",
-    "mailparser": "^3.6.5"
+    "mailparser": "^3.6.5",
+    "protobufjs": "^7.2.4"
   }
 }
