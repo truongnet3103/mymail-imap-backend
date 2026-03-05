@@ -207,8 +207,11 @@ function fetchEmails(config) {
                 // Use merge: true to upsert (create if not exists, update if exists)
                 batch.set(docRef, {
                   ...email,
+                  sender: email.from, // Alias for frontend compatibility
                   userId: userId,
-                  fetchedAt: new Date().toISOString()
+                  fetchedAt: new Date().toISOString(),
+                  createdAt: new Date().toISOString(), // Required for frontend sorting
+                  isRead: false // Default unread state
                 }, { merge: true });
 
                 queuedCount++;
