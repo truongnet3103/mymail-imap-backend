@@ -11,67 +11,35 @@ function stripHtml(html) {
     .trim();
 }
 
-// Remove quoted replies, signatures, headers
+// Remove signatures and quoted replies
 function cleanEmailBody(text) {
   if (!text) return '';
   
   const lines = text.split('\n');
   const result = [];
-  let inQuotedBlock = false;
   let inSignature = false;
-
-  // Patterns that indicate start of quoted content or metadata
-  const quotedStartPatterns = [
-    /^On\s.+wrote:?$/i,           // "On Mon, ... wrote:"
-    /^From:\s+/i,                 // "From: name <email>"
-    /^Sent:\s+/i,                 // "Sent: Monday, ..."
-    /^To:\s+/i,                   // "To: ..."
-    /^Cc:\s+/i,                   // "Cc: ..."
-    /^Subject:\s+/i,              // "Subject: ..."
-    /^Date:\s+/i,                 // "Date: ..."
-    /^---+$/m,                    // "---"
-    /^_{3,}$/m,                   // "___"
-    /^[*]{3,}$/m,                // "***"
-    /^--\s*$/m,                   // "--"
-    /^Original Message$/i,        // "Original Message"
-    /^\[img\]/i,                  // "[img]"
-    /^\[cid:/i                    // "[cid:...]"
-  ];
-
-  // Check if line is part of a signature (after '-- ')
-  const signaturePattern = /^--\s*$/;
+  let inQuotedBlock = false;
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
+    const trimmed = line.trim();
 
-    // Check for signature delimiter
-    if (signaturePattern.test(line.trim())) {
+    // Signature: stops at a line that is exactly "-- " (or "--")
+    if (/^--\s*$/.test(trimmed)) {
       inSignature = true;
       continue;
     }
-
-    // Skip everything after signature
     if (inSignature) continue;
 
-    // Check for quoted block start (lines beginning with '>')
-    if (/^>\s?/.test(line)) {
+    // Quoted content: lines starting with '>'
+    if (/^>/.test(line)) {
       inQuotedBlock = true;
       continue;
     }
+    if (inQuotedBlock) break;
 
-    // If we are in a quoted block, skip until we hit a non-quoted line? 
-    // Actually once we see a quoted line, we stop entirely because it's usually at the end anyway.
-    if (inQuotedBlock) {
-      break;
-    }
-
-    // Check for metadata headers that indicate forwarded content
-    if (quotedStartPatterns.some(re => re.test(line))) {
-      break; // stop including further content
-    }
-
-    // Skip empty lines at the very beginning (leading whitespace)
-    if (result.length === 0 && line.trim() === '') continue;
+    // Skip initial empty lines
+    if (result.length === 0 && trimmed === '') continue;
 
     result.push(line);
   }
