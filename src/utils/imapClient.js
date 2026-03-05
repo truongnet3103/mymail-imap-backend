@@ -22,7 +22,7 @@ function cleanEmailBody(text) {
     // Delimiters
     /^---+/i, /^_{3,}/i, /^\*{3,}/i,
     // Quoted reply hints
-    /^On\s.+wrote:$/i, /^Vào lúc/i,
+    /^On\s.+wrote:$/i, /^Vï¿½o lï¿½c/i,
     // Salutation markers (start of signature)
     /^Thanks,?$/i, /^Thank you,?$/i, /^Thanks and best regards,?$/i,
     /^Regards,?$/i, /^Best regards,?$/i, /^Sincerely,?$/i,
@@ -60,7 +60,7 @@ function testConnection(config) {
       user, password, host,
       port: parseInt(port) || 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
+      tlsOptions: { rejectUnauthorized: true }, // security: validate SSL
       authTimeout: 10000,
       connTimeout: 10000
     });
@@ -77,6 +77,7 @@ function testConnection(config) {
     imap.once('error', (err) => {
       if (done) return;
       done = true;
+      imap.end();
       reject({ success: false, error: err.message });
     });
 
@@ -99,12 +100,13 @@ function fetchEmails(config) {
       user, password, host,
       port: parseInt(port) || 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
+      tlsOptions: { rejectUnauthorized: true },
       authTimeout: 10000,
       connTimeout: 15000
     });
 
     const emails = [];
+    const parsePromises = [];
     let done = false;
 
     imap.once('ready', () => {
@@ -112,6 +114,7 @@ function fetchEmails(config) {
         if (err) {
           if (!done) {
             done = true;
+            imap.end();
             return reject({ success: false, error: `Failed to open folder: ${err.message}` });
           }
           return;
@@ -135,43 +138,54 @@ function fetchEmails(config) {
             stream.on('data', (chunk) => buffer += chunk.toString());
           });
 
-          msg.once('end', async () => {
-            try {
-              const parsed = await simpleParser(buffer);
-              let cleanBody = parsed.text || '';
-              if (!cleanBody && parsed.html) {
-                cleanBody = stripHtml(parsed.html);
+          const p = new Promise((resolveParse) => {
+            msg.once('end', async () => {
+              try {
+                const parsed = await simpleParser(buffer, {
+                  skipHtmlToText: false,
+                  skipImageLinks: true,
+                  maxBodyLength: 500000
+                });
+                let cleanBody = parsed.text || '';
+                if (!cleanBody && parsed.html) {
+                  cleanBody = stripHtml(parsed.html);
+                }
+                cleanBody = cleanEmailBody(cleanBody);
+                emails.push({
+                  id: parsed.messageId || `msg-${Date.now()}-${emails.length}`,
+                  from: parsed.from?.text || '',
+                  subject: parsed.subject || '',
+                  body: cleanBody.substring(0, 5000),
+                  date: parsed.date?.toISOString() || new Date().toISOString(),
+                  messageId: parsed.messageId
+                });
+              } catch (e) {
+                console.error('Parse error:', e.message);
+              } finally {
+                resolveParse();
               }
-              // Apply email cleaning to remove signatures, footers, quoted replies
-              cleanBody = cleanEmailBody(cleanBody);
-
-              emails.push({
-                id: parsed.messageId || `msg-${Date.now()}-${emails.length}`,
-                from: parsed.from?.text || '',
-                subject: parsed.subject || '',
-                body: cleanBody.substring(0, 5000),
-                date: parsed.date?.toISOString() || new Date().toISOString(),
-                messageId: parsed.messageId
-              });
-            } catch (e) {
-              console.error('Parse error:', e.message);
-            }
+            });
           });
+          parsePromises.push(p);
         });
 
-        fetch.once('end', () => {
-          setTimeout(() => {
-            if (!done) {
-              done = true;
-              imap.end();
-              resolve({ success: true, emails, total: box.messages.total });
-            }
-          }, 500);
+        fetch.once('end', async () => {
+          try {
+            await Promise.all(parsePromises);
+          } catch (e) {
+            console.error('Parse promise error:', e);
+          }
+          if (!done) {
+            done = true;
+            imap.end();
+            resolve({ success: true, emails, total: box.messages.total });
+          }
         });
 
         fetch.once('error', (err) => {
           if (!done) {
             done = true;
+            imap.end();
             reject({ success: false, error: err.message });
           }
         });
@@ -198,5 +212,9 @@ function fetchEmails(config) {
 }
 
 module.exports = { testConnection, fetchEmails };
+module.exports = { testConnection, fetchEmails };
+
+
+
 
 
