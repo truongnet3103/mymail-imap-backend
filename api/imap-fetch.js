@@ -14,13 +14,19 @@ module.exports = async (req, res) => {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const errors = validateImapFetch(req.body);
+  // Map email -> user for compatibility
+  const body = { ...req.body };
+  if (!body.user && body.email) {
+    body.user = body.email;
+  }
+
+  const errors = validateImapFetch(body);
   if (errors.length > 0) {
     return res.status(400).json({ success: false, errors });
   }
 
   try {
-    const result = await fetchEmails(req.body);
+    const result = await fetchEmails(body);
     return res.status(200).json(result);
   } catch (err) {
     console.error('IMAP fetch error:', err);
