@@ -74,7 +74,7 @@ module.exports = async (req, res) => {
         const docRef = await db.collection('emails').add(emailData);
 
         // Tóm tắt với AI nếu có config và có nội dung
-        if (emailData.content && config.aiProvider && config.aiModel && config.geminiKey) {
+        if (emailData.content && config.aiProvider && config.aiModel && config.aiApiKey) {
           try {
             const summary = await summarizeWithAI(emailData.content, config);
             if (summary) {
@@ -104,35 +104,97 @@ module.exports = async (req, res) => {
 
 // Hàm tóm tắt email bằng AI
 async function summarizeWithAI(content, config) {
-  const { aiProvider, aiModel, geminiKey } = config;
-
-  // Chỉ hỗ trợ Gemini cho đơn giản (có thể mở rộng)
-  if (aiProvider !== 'gemini') {
-    console.warn(`AI provider ${aiProvider} not supported for summarization yet`);
-    return null;
-  }
-
+  const { aiProvider, aiModel, aiApiKey } = config;
   const prompt = `Tóm tắt nội dung email sau đây trong tối đa 2 câu, tập trung vào thông tin chính, yêu cầu hành động, và mục đích:\n\n${content.substring(0, 10000)}`;
 
   try {
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent?key=${geminiKey}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 200
+    // Gemini (Google)
+    if (aiProvider === 'gemini') {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent?key=${aiApiKey}`,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 200 }
         }
-      }
-    );
-
-    const candidates = response.data.candidates;
-    if (candidates && candidates.length > 0 && candidates[0].content && candidates[0].content.parts) {
-      return candidates[0].content.parts[0].text.trim();
+      );
+      const c = response.data.candidates?.[0];
+      if (c?.content?.parts?.[0]?.text) return c.content.parts[0].text.trim();
+      return null;
     }
+
+    // OpenAI & OpenRouter (compatible)
+    if (aiProvider === 'openai' || aiProvider === 'openrouter') {
+      const endpoint = aiProvider === 'openai'
+        ? 'https://api.openai.com/v1/chat/completions'
+        : 'https://openrouter.ai/api/v1/chat/completions';
+      const headers = {
+        'Authorization': `Bearer ${aiApiKey}`,
+        'Content-Type': 'application/json'
+      };
+      if (aiProvider === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://mymail-imap.web.app';
+        headers['X-Title'] = 'MyMail IMAP';
+      }
+      const response = await axios.post(endpoint, {
+        model: aiModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 200,
+        temperature: 0.3
+      }, { headers });
+      const choice = response.data.choices?.[0];
+      if (choice?.message?.content) return choice.message.content.trim();
+      return null;
+    }
+
+    // Anthropic
+    if (aiProvider === 'anthropic') {
+      const response = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        {
+          model: aiModel,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 200,
+          temperature: 0.3
+        },
+        {
+          headers: {
+            'x-api-key': aiApiKey,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      const block = response.data.content?.[0];
+      if (block?.text) return block.text.trim();
+      return null;
+    }
+
+    // Moonshot
+    if (aiProvider === 'moonshot') {
+      const response = await axios.post(
+        'https://api.moonshot.cn/v1/chat/completions',
+        {
+          model: aiModel,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 200,
+          temperature: 0.3
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${aiApiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      const choice = response.data.choices?.[0];
+      if (choice?.message?.content) return choice.message.content.trim();
+      return null;
+    }
+
+    console.warn(`AI provider ${aiProvider} not supported yet`);
     return null;
   } catch (err) {
-    console.error('[Gemini API error]', err.response?.data || err.message);
+    console.error('[AI API error]', err.response?.data || err.message);
     throw err;
   }
 }
