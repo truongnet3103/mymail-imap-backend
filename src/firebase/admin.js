@@ -2,16 +2,23 @@ const admin = require('firebase-admin');
 
 // Initialize only once
 if (!admin.apps.length) {
-  // Service account should be set via Vercel Environment Variables
-  // Use applicationDefault() which picks up GOOGLE_APPLICATION_CREDENTIALS or Vercel secrets
   try {
+    let credential;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      // Use service account JSON from environment variable
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      credential = admin.credential.cert(serviceAccount);
+    } else {
+      // Fallback to application default (for local testing with GOOGLE_APPLICATION_CREDENTIALS)
+      credential = admin.credential.applicationDefault();
+    }
+
     admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
+      credential,
       databaseURL: process.env.FIREBASE_DATABASE_URL || undefined
     });
   } catch (error) {
     console.error('Firebase Admin initialization error:', error.message);
-    // Re-throw to fail fast if Firebase is required
     throw error;
   }
 }

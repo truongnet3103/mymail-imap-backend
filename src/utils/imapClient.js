@@ -11,6 +11,49 @@ function stripHtml(html) {
     .trim();
 }
 
+// Remove quoted replies, signatures, headers
+function cleanEmailBody(text) {
+  if (!text) return '';
+  
+  // Split by common quoted reply delimiters
+  const delimiters = [
+    /^From:.*$/im,
+    /^Sent:.*$/im,
+    /^To:.*$/im,
+    /^Subject:.*$/im,
+    /^On.*wrote:$/im,
+    /^---+\s*Original Message\s*---/im,
+    /^>+/, // quoted lines starting with >
+    /^_{3,}$/im, // separator lines (___)
+    /^[-*]{3,}$/im,
+    /^--\s*$/im,
+    /^\[img\]/i,
+    /^\[cid:/i
+  ];
+
+  let lines = text.split('\n');
+  let result = [];
+  let skip = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check if line matches any delimiter
+    if (delimiters.some(re => re.test(line))) {
+      skip = true;
+      break; // stop at first delimiter
+    }
+
+    // Skip empty lines at start
+    if (result.length === 0 && !trimmed) continue;
+
+    result.push(line);
+  }
+
+  return result.join('\n').trim();
+}
+
 function testConnection(config) {
   return new Promise((resolve, reject) => {
     const { user, password, host, port } = config;
