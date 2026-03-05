@@ -2,6 +2,9 @@ const Imap = require('imap');
 const { simpleParser } = require('mailparser');
 const { db } = require('../firebase/admin');
 
+// Debug: check db on load
+console.log('[imapClient] module loaded, db ok:', db ? 'yes' : 'no');
+
 function stripHtml(html) {
   if (!html) return '';
   return html
@@ -95,7 +98,7 @@ function testConnection(config) {
 
 function fetchEmails(config) {
   return new Promise((resolve, reject) => {
-    console.log('[fetch-emails] called with config:', { ...config, password: '***' });
+    console.log('[fetch-emails] START', { user: config.user, host: config.host, port: config.port, folder: config.folder, limit: config.limit });
     console.log('[fetch-emails] db instance:', db ? 'ok' : 'null');
     const { user, password, host, port, folder = 'INBOX', limit = 20 } = config;
 
