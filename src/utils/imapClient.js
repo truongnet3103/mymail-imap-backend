@@ -23,8 +23,19 @@ function cleanEmailBody(text) {
   const parts = normalized.split(/\r?\n(?=---|From:)/i);
   let mainPart = parts[0];
   
-  // Remove trailing footer/signature lines from mainPart
-  const lines = mainPart.split('\n');
+  // Remove signature block (salutations and name) first
+  let lines = mainPart.split('\n');
+  const signatureStartRegex = /^(\s*(--|__|---)[\s]*$|^Thanks[.,]?\s*$|^Thank you[.,]?\s*$|^Regards[.,]?\s*$|^Best regards[.,]?\s*$|^Sincerely[.,]?\s*$|^Yours sincerely[.,]?\s*$|^Yours truly[.,]?\s*$|^Kind regards[.,]?\s*$|^Best[.,]?\s*$)/im;
+  let sigIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (signatureStartRegex.test(lines[i])) {
+      sigIdx = i;
+      break;
+    }
+  }
+  if (sigIdx !== -1) {
+    lines = lines.slice(0, sigIdx);
+  }
   
   const footerPatterns = [
     /^SBGear Vina/i,
