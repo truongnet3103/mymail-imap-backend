@@ -56,6 +56,7 @@ function cleanEmailBody(text) {
   }
   return result.join('\n').trim();
 }
+
 function testConnection(config) {
   return new Promise((resolve, reject) => {
     const { user, password, host, port } = config;
@@ -64,7 +65,7 @@ function testConnection(config) {
       user, password, host,
       port: parseInt(port) || 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false }, // security: validate SSL
+      tlsOptions: { rejectUnauthorized: false },
       authTimeout: 10000,
       connTimeout: 10000
     });
@@ -181,14 +182,12 @@ function fetchEmails(config) {
         fetch.once('end', async () => {
           console.log('[fetch-emails] fetch end event, waiting for', messagesExpected, 'messages to parse');
           try {
-            // Wait for all parse promises to complete
             await Promise.all(parsePromises);
             console.log('[fetch-emails] all parse promises resolved, total emails:', emails.length);
           } catch (e) {
             console.error('[fetch-emails] parse error:', e);
           }
 
-          // Save emails to Firestore using batch write with upsert (merge: true)
           if (emails.length > 0) {
             console.log('[fetch-emails] Starting Firestore batch save (upsert)');
             try {
@@ -197,21 +196,19 @@ function fetchEmails(config) {
               let queuedCount = 0;
 
               for (const email of emails) {
-                // Sanitize messageId for Firestore document ID
                 let docId = email.messageId || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                 if (docId) {
                   docId = docId.replace(/[<>]/g, '').replace(/[\/#?]/g, '');
                 }
                 const docRef = db.collection('emails').doc(docId);
 
-                // Use merge: true to upsert (create if not exists, update if exists)
                 batch.set(docRef, {
                   ...email,
-                  sender: email.from, // Alias for frontend compatibility
+                  sender: email.from,
                   userId: userId,
                   fetchedAt: new Date().toISOString(),
-                  createdAt: new Date().toISOString(), // Required for frontend sorting
-                  isRead: false // Default unread state
+                  createdAt: new Date().toISOString(),
+                  isRead: false
                 }, { merge: true });
 
                 queuedCount++;
@@ -222,7 +219,6 @@ function fetchEmails(config) {
               console.log(`[fetch-emails] Firestore batch save complete: ${queuedCount} emails upserted`);
             } catch (e) {
               console.error('[Firestore] Save error:', e);
-              // Fail the request if Firestore save fails
               return reject({ success: false, error: `Firestore save failed: ${e.message}` });
             }
           } else {
@@ -266,15 +262,3 @@ function fetchEmails(config) {
 }
 
 module.exports = { testConnection, fetchEmails };
-
-
-
-
-
-
-
-
-
-. 
- 
- 
