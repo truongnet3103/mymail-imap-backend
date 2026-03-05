@@ -2,7 +2,6 @@ const Imap = require('imap');
 const { simpleParser } = require('mailparser');
 const { db } = require('../firebase/admin');
 
-// Debug: check db on load
 console.log('[imapClient] module loaded, db ok:', db ? 'yes' : 'no');
 
 function stripHtml(html) {
@@ -15,43 +14,32 @@ function stripHtml(html) {
     .trim();
 }
 
-// Advanced email body cleaner: removes signatures, quoted replies, footers
 function cleanEmailBody(text) {
   if (!text) return '';
   const lines = text.split(/\r?\n/);
   const result = [];
   const stopMarkers = [
-    // Forwarded email headers
     /^From:/i, /^Sent:/i, /^To:/i, /^Cc:/i, /^Subject:/i,
-    // Delimiters
     /^---+/i, /^_{3,}/i, /^\*{3,}/i,
-    // Quoted reply hints
-    /^On\s.+wrote:$/i, /^V�o l�c/i,
-    // Salutation markers (start of signature)
+    /^On\s.+wrote:$/i,
     /^Thanks,?$/i, /^Thank you,?$/i, /^Thanks and best regards,?$/i,
     /^Regards,?$/i, /^Best regards,?$/i, /^Sincerely,?$/i,
     /^Yours sincerely,?$/i, /^Yours truly,?$/i, /^Kind regards,?$/i, /^Best,?$/i,
-    // Company-specific footer keywords
     /SBGear Vina/i, /88D,? Duong Cong Khi/i, /Hoc Mon Dist/i,
     /Please ensure the materials strictly follow/i,
     /PFAS FREE/i, /PFAS COMPLIANT/i, /Zalo\/WeChat/i, /VAT CODE/i,
-    // Contact info lines
     /Add(?:ress)?:/i, /^Tel:/i, /^Mobile:/i, /^Fax:/i, /^Email:/i,
     /^Website:/i, /^URL:/i, /^Group email:/i, /^TAX CODE/i, /^Contact:/i,
-    // Address patterns
     /^\d{1,2}[A-Za-z]{3,} \d{6,}/i,
     /^1st Floor/i, /^Vista Building/i, /^Ho Chi Minh City/i, /^Vietnam$/i,
-    // URLs
     /^https?:\/\/\S+$/i,
-    // Separator lines
     /^--\s*$/i, /^_\s*$/i, /^-\s*$/i,
-    // Inline media / CID markers
     /^\[img\]/i, /^\[cid:/i
   ];
   for (let line of lines) {
     const trimmed = line.trim();
     if (stopMarkers.some(m => m.test(trimmed))) break;
-    if (trimmed === '' || /^[^a-zA-Z0-9]+$/.test(trimmed)) continue; // skip icon-only lines
+    if (trimmed === '' || /^[^a-zA-Z0-9]+$/.test(trimmed)) continue;
     result.push(trimmed);
   }
   return result.join('\n').trim();
@@ -60,7 +48,6 @@ function cleanEmailBody(text) {
 function testConnection(config) {
   return new Promise((resolve, reject) => {
     const { user, password, host, port } = config;
-
     const imap = new Imap({
       user, password, host,
       port: parseInt(port) || 993,
@@ -69,30 +56,25 @@ function testConnection(config) {
       authTimeout: 10000,
       connTimeout: 10000
     });
-
     let done = false;
-
     imap.once('ready', () => {
       if (done) return;
       done = true;
       imap.end();
       resolve({ success: true, message: 'Connected successfully' });
     });
-
     imap.once('error', (err) => {
       if (done) return;
       done = true;
       imap.end();
       reject({ success: false, error: err.message });
     });
-
     imap.once('timeout', () => {
       if (done) return;
       done = true;
       imap.end();
       reject({ success: false, error: 'Connection timeout' });
     });
-
     imap.connect();
   });
 }
@@ -102,7 +84,6 @@ function fetchEmails(config) {
     console.log('[fetch-emails] START', { user: config.user, host: config.host, port: config.port, folder: config.folder, limit: config.limit });
     console.log('[fetch-emails] db instance:', db ? 'ok' : 'null');
     const { user, password, host, port, folder = 'INBOX', limit = 20 } = config;
-
     const imap = new Imap({
       user, password, host,
       port: parseInt(port) || 993,
@@ -111,12 +92,10 @@ function fetchEmails(config) {
       authTimeout: 10000,
       connTimeout: 15000
     });
-
     const emails = [];
     const parsePromises = [];
     let messagesExpected = 0;
     let done = false;
-
     imap.once('ready', () => {
       imap.openBox(folder, false, (err, box) => {
         if (err) {
@@ -127,7 +106,6 @@ function fetchEmails(config) {
           }
           return;
         }
-
         if (box.messages.total === 0) {
           if (!done) {
             done = true;
@@ -136,18 +114,15 @@ function fetchEmails(config) {
           }
           return;
         }
-
         const fetchCount = Math.min(parseInt(limit), box.messages.total);
         messagesExpected = fetchCount;
         const fetch = imap.seq.fetch(`${box.messages.total - fetchCount + 1}:${box.messages.total}`, { bodies: '' });
-
         fetch.on('message', (msg) => {
           const p = new Promise((resolveParse) => {
             let buffer = '';
             msg.on('body', (stream) => {
               stream.on('data', (chunk) => buffer += chunk.toString());
             });
-
             msg.once('end', async () => {
               try {
                 const parsed = await simpleParser(buffer, {
@@ -178,7 +153,6 @@ function fetchEmails(config) {
           });
           parsePromises.push(p);
         });
-
         fetch.once('end', async () => {
           console.log('[fetch-emails] fetch end event, waiting for', messagesExpected, 'messages to parse');
           try {
@@ -187,21 +161,18 @@ function fetchEmails(config) {
           } catch (e) {
             console.error('[fetch-emails] parse error:', e);
           }
-
           if (emails.length > 0) {
             console.log('[fetch-emails] Starting Firestore batch save (upsert)');
             try {
               const userId = 'default-user-id';
               const batch = db.batch();
               let queuedCount = 0;
-
               for (const email of emails) {
                 let docId = email.messageId || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                 if (docId) {
                   docId = docId.replace(/[<>]/g, '').replace(/[\/#?]/g, '');
                 }
                 const docRef = db.collection('emails').doc(docId);
-
                 batch.set(docRef, {
                   ...email,
                   sender: email.from,
@@ -210,11 +181,9 @@ function fetchEmails(config) {
                   createdAt: new Date().toISOString(),
                   isRead: false
                 }, { merge: true });
-
                 queuedCount++;
                 console.log('[Firestore] Queued email for batch:', docId);
               }
-
               await batch.commit();
               console.log(`[fetch-emails] Firestore batch save complete: ${queuedCount} emails upserted`);
             } catch (e) {
@@ -224,14 +193,12 @@ function fetchEmails(config) {
           } else {
             console.log('[fetch-emails] No emails to save');
           }
-
           if (!done) {
             done = true;
             imap.end();
             resolve({ success: true, emails, total: box.messages.total });
           }
         });
-
         fetch.once('error', (err) => {
           if (!done) {
             done = true;
@@ -241,14 +208,12 @@ function fetchEmails(config) {
         });
       });
     });
-
     imap.once('error', (err) => {
       if (!done) {
         done = true;
         reject({ success: false, error: err.message });
       }
     });
-
     imap.once('timeout', () => {
       if (!done) {
         done = true;
@@ -256,7 +221,6 @@ function fetchEmails(config) {
         reject({ success: false, error: 'IMAP connection timeout' });
       }
     });
-
     imap.connect();
   });
 }
