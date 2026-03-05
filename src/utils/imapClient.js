@@ -11,70 +11,110 @@ function stripHtml(html) {
     .trim();
 }
 
-// Clean email body: remove signatures, quoted replies, forwarded headers
+// Advanced email body cleaner: removes signatures, quoted replies, footers
 function cleanEmailBody(text) {
   if (!text) return '';
   
-  const lines = text.split(/\r?\n/);
+  // 1. Normalize line endings
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
   const result = [];
 
-  // Patterns that indicate start of old content (forwarded/replied)
-  const replyHeaders = [
-    /^From:/i,
-    /^Sent:/i,
-    /^To:/i,
-    /^Cc:/i,
-    /^Subject:/i,
-    /^Date:/i,
-    /^On\s.+wrote:?$/i,         // "On Mon, ... wrote:"
-    /^Vào lúc/i,                // Vietnamese: "Vào lúc..."
-    /^---.*Original Message/i,  // "--- Original Message"
-    /^---+\s*$/i,               // "---" separator
-    /^_{3,}$/i,                 // "___"
-    /^[*]{3,}$/i,              // "***"
-    /^--\s*$/i,                 // "--"
-    /^Original Message$/i
+  // 2. Patterns to detect start of unwanted content
+  const stopPatterns = [
+    // Quoted reply markers
+    /^>/,
+    // Email headers (forwarded part)
+    /^From:\s+/i,
+    /^Sent:\s+/i,
+    /^To:\s+/i,
+    /^Cc:\s+/i,
+    /^Subject:\s+/i,
+    /^Date:\s+/i,
+    /^Reply-To:\s+/i,
+    // Common delimiter lines
+    /^---+\s*$/i,
+    /^_{3,}$/i,
+    /^\*{3,}$/i,
+    /^--\s*$/i,
+    // "On ... wrote:" pattern (English)
+    /^On\s.+wrote:$/i,
+    // "Vào lúc ... ai đó đã viết" (Vietnamese)
+    /^Vào lúc/i,
+    // Original Message header
+    /^Original Message$/i,
+    /^---.*Original Message/i,
+    // Mailing list footers (common)
+    /^You are receiving this email because/i,
+    /^To unsubscribe/i,
+    /^View this email in your browser/i,
+    /^https?:\/\/\S+$/i, // URLs at the end (often tracking/ unsubscribe)
+    // Signature start markers
+    /^--\s*$/i,
+    /^__$/i,
+    /^-\s*$/i
   ];
 
-  // Signature keywords (company name, address patterns)
+  // Signature keywords (match if line contains these)
   const signatureKeywords = [
-    /SBGear Vina Co\., Ltd/i,
+    /SBGear Vina/i,
     /88D Duong Cong Khi/i,
-    /Contact: \d+/i,
-    /^\d{1,2}[A-Za-z]{3,} \d{6,}$/i, // e.g., "88D Duong..."
-    /^\[img\]/i,
-    /^\[cid:/i
+    /Contact:/i,
+    /Tel:/i,
+    /Fax:/i,
+    /Email:/i,
+    /Website:/i,
+    /^\d{1,2}[A-Za-z]{3,} \d{6,}/, // Address pattern like "88D Duong..."
+    /^\d{1,2}[A-Za-z]{3,} \d+$/,
   ];
+
+  let foundStop = false;
+  let blankLineCount = 0; // Count consecutive blank lines at the start
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Check for quoted reply markers (lines starting with '>')
-    if (/^>\s?/.test(line)) {
-      break; // stop at first quoted line
+    // Skip leading blank lines entirely
+    if (result.length === 0 && trimmed === '') {
+      continue;
     }
 
-    // Check for forwarded email headers (From, Sent, To, Cc, Subject)
-    // These indicate the start of old content below
-    const isReplyHeader = replyHeaders.some(regex => regex.test(trimmed));
-    if (isReplyHeader) {
-      break; // stop including further content
+    // Check for stop patterns (quoted content, headers, delimiters)
+    if (!foundStop) {
+      const isStop = stopPatterns.some(regex => regex.test(line));
+      if (isStop) {
+        foundStop = true;
+        break; // Stop processing completely
+      }
     }
 
-    // Check for signature lines (company name, address, etc.)
+    // Check for signature keywords (if line looks like signature)
+    // If we see signature keywords, we stop after that line maybe?
+    // Actually usually signature lines are at the very end, after a blank line.
+    // We'll break if we see signature keyword AND it's not part of the main content (usually after a blank line).
     const isSignature = signatureKeywords.some(regex => regex.test(trimmed));
     if (isSignature) {
-      break; // stop before signature
+      // If we already have some content and then a signature line, stop BEFORE it
+      if (result.length > 0) {
+        // Check if previous line was blank (common signature separator)
+        const prevLine = lines[i-1]?.trim();
+        if (prevLine === '') {
+          break;
+        }
+        // Also break even if not blank, to be safe
+        break;
+      }
     }
-
-    // Skip empty lines at the very beginning
-    if (result.length === 0 && trimmed === '') continue;
 
     result.push(line);
   }
 
-  return result.join('\n').trim();
+  // 3. Trim trailing blank lines and spaces
+  let cleaned = result.join('\n').trim();
+  // Remove trailing blank lines
+  cleaned = cleaned.replace(/\n\s*\n\s*$/g, '');
+  return cleaned;
 }
 
 function testConnection(config) {
