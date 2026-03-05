@@ -11,34 +11,64 @@ function stripHtml(html) {
     .trim();
 }
 
-// Remove signatures and quoted replies
+// Clean email body: remove signatures, quoted replies, forwarded headers
 function cleanEmailBody(text) {
   if (!text) return '';
   
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   const result = [];
-  let inSignature = false;
-  let inQuotedBlock = false;
+
+  // Patterns that indicate start of old content (forwarded/replied)
+  const replyHeaders = [
+    /^From:/i,
+    /^Sent:/i,
+    /^To:/i,
+    /^Cc:/i,
+    /^Subject:/i,
+    /^Date:/i,
+    /^On\s.+wrote:?$/i,         // "On Mon, ... wrote:"
+    /^Vào lúc/i,                // Vietnamese: "Vào lúc..."
+    /^---.*Original Message/i,  // "--- Original Message"
+    /^---+\s*$/i,               // "---" separator
+    /^_{3,}$/i,                 // "___"
+    /^[*]{3,}$/i,              // "***"
+    /^--\s*$/i,                 // "--"
+    /^Original Message$/i
+  ];
+
+  // Signature keywords (company name, address patterns)
+  const signatureKeywords = [
+    /SBGear Vina Co\., Ltd/i,
+    /88D Duong Cong Khi/i,
+    /Contact: \d+/i,
+    /^\d{1,2}[A-Za-z]{3,} \d{6,}$/i, // e.g., "88D Duong..."
+    /^\[img\]/i,
+    /^\[cid:/i
+  ];
 
   for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
+    const line = lines[i];
     const trimmed = line.trim();
 
-    // Signature: stops at a line that is exactly "-- " (or "--")
-    if (/^--\s*$/.test(trimmed)) {
-      inSignature = true;
-      continue;
+    // Check for quoted reply markers (lines starting with '>')
+    if (/^>\s?/.test(line)) {
+      break; // stop at first quoted line
     }
-    if (inSignature) continue;
 
-    // Quoted content: lines starting with '>'
-    if (/^>/.test(line)) {
-      inQuotedBlock = true;
-      continue;
+    // Check for forwarded email headers (From, Sent, To, Cc, Subject)
+    // These indicate the start of old content below
+    const isReplyHeader = replyHeaders.some(regex => regex.test(trimmed));
+    if (isReplyHeader) {
+      break; // stop including further content
     }
-    if (inQuotedBlock) break;
 
-    // Skip initial empty lines
+    // Check for signature lines (company name, address, etc.)
+    const isSignature = signatureKeywords.some(regex => regex.test(trimmed));
+    if (isSignature) {
+      break; // stop before signature
+    }
+
+    // Skip empty lines at the very beginning
     if (result.length === 0 && trimmed === '') continue;
 
     result.push(line);
