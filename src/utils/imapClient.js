@@ -14,85 +14,30 @@ function stripHtml(html) {
 // Advanced email body cleaner: removes signatures, quoted replies, footers
 function cleanEmailBody(text) {
   if (!text) return '';
-  
-  // Normalize line endings
-  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  
-  // Split at forwarded separators to keep only newest content
-  // Take everything before '---' or a line starting with 'From:' (case-insensitive)
-  const parts = normalized.split(/\r?\n(?=---|From:)/i);
-  let mainPart = parts[0];
-  
-  // Remove signature block (salutations and name) first
-  let lines = mainPart.split('\n');
-  const signatureStartRegex = /^(\s*(--|__|---)[\s]*$|^Thanks[.,]?\s*$|^Thank you[.,]?\s*$|^Regards[.,]?\s*$|^Best regards[.,]?\s*$|^Sincerely[.,]?\s*$|^Yours sincerely[.,]?\s*$|^Yours truly[.,]?\s*$|^Kind regards[.,]?\s*$|^Best[.,]?\s*$)/im;
-  let sigIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (signatureStartRegex.test(lines[i])) {
-      sigIdx = i;
-      break;
-    }
-  }
-  if (sigIdx !== -1) {
-    lines = lines.slice(0, sigIdx);
-  }
-  
-  const footerPatterns = [
-    /^SBGear Vina/i,
-    /^88D Duong Cong Khi/i,
-    /^Add(?:ress)?:/i,
-    /^Contact:/i,
-    /^Tel:/i,
-    /^Mobile:/i,
-    /^Fax:/i,
-    /^Email:/i,
-    /^Website:/i,
-    /^URL:/i,
-    /^Group email:/i,
-    /^TAX CODE/i,
-    /^VAT CODE/i,
-    /^1st Floor/i,
-    /^Vista Building/i,
-    /^Ho Chi Minh City/i,
-    /^Vietnam$/i,
-    /^https?:\/\/\S+$/i,
-    /^\[img\]/i,
-    /^\[cid:/i,
-    /^Thanks[.,]?$/i,
-    /^Thank you[.,]?$/i,
-    /^Regards[.,]?$/i,
-    /^Best regards[.,]?$/i,
-    /^Sincerely[.,]?$/i,
-    /^Yours sincerely[.,]?$/i,
-    /^--\s*$/i,
-    /^_\s*$/i,
-    /^-\s*$/i,
-    // Address patterns
-    /^\d{1,2}[A-Za-z]{3,} \d{6,}/i,
-    /^\d{1,2}[A-Za-z]{3,},? \d+$/i,
-    /^[A-Za-z0-9\s]+,\s*[A-Za-z\s]+$/i
+  const lines = text.split(/\r?\n/);
+  const result = [];
+  const stopMarkers = [
+    /^From:/i, /^Sent:/i, /^To:/i, /^Cc:/i, /^Subject:/i,
+    /^---/, /^_{5,}/, /^On.*wrote:/i, /^V�o l�c/i,
+    /Yours sincerely/i, /Best regards/i, /Thanks & Best regards/i,
+    /SBGear Vina/i, /88D,? Duong Cong Khi/i, /Hoc Mon Dist/i,
+    /Please ensure the materials strictly follow/i,
+    /PFAS FREE/i, /PFAS COMPLIANT/i, /Zalo\/WeChat/i, /VAT CODE/i,
+    /Add(?:ress)?:/i, /^Tel:/i, /^Mobile:/i, /^Fax:/i, /^Email:/i,
+    /^Website:/i, /^URL:/i, /^Group email:/i, /^TAX CODE/i,
+    /Contact:/i, /^\d{1,2}[A-Za-z]{3,} \d{6,}/i,
+    /^1st Floor/i, /^Vista Building/i, /^Ho Chi Minh City/i, /^Vietnam$/i,
+    /^https?:\/\/\S+$/i, /^--\s*$/i, /^_\s*$/i, /^-\s*$/i,
+    /^\[img\]/i, /^\[cid:/i
   ];
-
-  // Find last non-footer line from bottom up
-  let lastIdx = -1;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const trimmed = lines[i].trim();
-    if (trimmed === '') continue;
-    if (!footerPatterns.some(re => re.test(trimmed))) {
-      lastIdx = i;
-      break;
-    }
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (stopMarkers.some(m => m.test(trimmed))) break;
+    if (trimmed === '' || /^[^a-zA-Z0-9]+$/.test(trimmed)) continue;
+    result.push(trimmed);
   }
-
-  if (lastIdx === -1) return '';
-
-  const kept = lines.slice(0, lastIdx + 1);
-  let cleaned = kept.join('\n').trim();
-  // Remove multiple trailing blank lines
-  cleaned = cleaned.replace(/\n\s*\n\s*$/g, '');
-  return cleaned;
+  return result.join('\n').trim();
 }
-
 function testConnection(config) {
   return new Promise((resolve, reject) => {
     const { user, password, host, port } = config;
@@ -183,6 +128,8 @@ function fetchEmails(config) {
               if (!cleanBody && parsed.html) {
                 cleanBody = stripHtml(parsed.html);
               }
+              // Apply email cleaning to remove signatures, footers, quoted replies
+              cleanBody = cleanEmailBody(cleanBody);
 
               emails.push({
                 id: parsed.messageId || `msg-${Date.now()}-${emails.length}`,
@@ -237,3 +184,4 @@ function fetchEmails(config) {
 }
 
 module.exports = { testConnection, fetchEmails };
+
