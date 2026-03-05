@@ -222,6 +222,8 @@ function fetchEmails(config) {
               console.log(`[fetch-emails] Firestore batch save complete: ${queuedCount} emails upserted`);
             } catch (e) {
               console.error('[Firestore] Save error:', e);
+              // Fail the request if Firestore save fails
+              return reject({ success: false, error: `Firestore save failed: ${e.message}` });
             }
           } else {
             console.log('[fetch-emails] No emails to save');
