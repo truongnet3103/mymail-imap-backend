@@ -135,15 +135,21 @@ function fetchEmails(config) {
                   cleanBody = stripHtml(parsed.html);
                 }
                 cleanBody = cleanEmailBody(cleanBody);
+                // Safely extract fields without optional chaining
+                const fromText = (parsed.from && parsed.from.text) ? parsed.from.text : '';
+                const subject = parsed.subject || '';
+                const date = (parsed.date && typeof parsed.date.toISOString === 'function') ? parsed.date.toISOString() : new Date().toISOString();
+                const messageId = parsed.messageId || '';
+                const emailId = messageId || `msg-${Date.now()}-${emails.length}`;
                 emails.push({
-                  id: parsed.messageId || `msg-${Date.now()}-${emails.length}`,
-                  from: parsed.from?.text || '',
-                  subject: parsed.subject || '',
+                  id: emailId,
+                  from: fromText,
+                  subject: subject,
                   body: cleanBody.substring(0, 5000),
-                  date: parsed.date?.toISOString() || new Date().toISOString(),
-                  messageId: parsed.messageId
+                  date: date,
+                  messageId: messageId
                 });
-                console.log('[parse] completed email:', emails.length, '/', messagesExpected, '-', parsed.subject?.substring(0, 30));
+                console.log('[parse] completed email:', emails.length, '/', messagesExpected, '-', subject.substring(0, 30));
               } catch (e) {
                 console.error('Parse error:', e.message);
               } finally {
