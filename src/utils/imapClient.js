@@ -17,23 +17,37 @@ function cleanEmailBody(text) {
   const lines = text.split(/\r?\n/);
   const result = [];
   const stopMarkers = [
+    // Forwarded email headers
     /^From:/i, /^Sent:/i, /^To:/i, /^Cc:/i, /^Subject:/i,
-    /^---/, /^_{5,}/, /^On.*wrote:/i, /^Vï¿½o lï¿½c/i,
-    /Yours sincerely/i, /Best regards/i, /Thanks & Best regards/i,
+    // Delimiters
+    /^---+/i, /^_{3,}/i, /^\*{3,}/i,
+    // Quoted reply hints
+    /^On\s.+wrote:$/i, /^Vào lúc/i,
+    // Salutation markers (start of signature)
+    /^Thanks,?$/i, /^Thank you,?$/i, /^Thanks and best regards,?$/i,
+    /^Regards,?$/i, /^Best regards,?$/i, /^Sincerely,?$/i,
+    /^Yours sincerely,?$/i, /^Yours truly,?$/i, /^Kind regards,?$/i, /^Best,?$/i,
+    // Company-specific footer keywords
     /SBGear Vina/i, /88D,? Duong Cong Khi/i, /Hoc Mon Dist/i,
     /Please ensure the materials strictly follow/i,
     /PFAS FREE/i, /PFAS COMPLIANT/i, /Zalo\/WeChat/i, /VAT CODE/i,
+    // Contact info lines
     /Add(?:ress)?:/i, /^Tel:/i, /^Mobile:/i, /^Fax:/i, /^Email:/i,
-    /^Website:/i, /^URL:/i, /^Group email:/i, /^TAX CODE/i,
-    /Contact:/i, /^\d{1,2}[A-Za-z]{3,} \d{6,}/i,
+    /^Website:/i, /^URL:/i, /^Group email:/i, /^TAX CODE/i, /^Contact:/i,
+    // Address patterns
+    /^\d{1,2}[A-Za-z]{3,} \d{6,}/i,
     /^1st Floor/i, /^Vista Building/i, /^Ho Chi Minh City/i, /^Vietnam$/i,
-    /^https?:\/\/\S+$/i, /^--\s*$/i, /^_\s*$/i, /^-\s*$/i,
+    // URLs
+    /^https?:\/\/\S+$/i,
+    // Separator lines
+    /^--\s*$/i, /^_\s*$/i, /^-\s*$/i,
+    // Inline media / CID markers
     /^\[img\]/i, /^\[cid:/i
   ];
   for (let line of lines) {
     const trimmed = line.trim();
     if (stopMarkers.some(m => m.test(trimmed))) break;
-    if (trimmed === '' || /^[^a-zA-Z0-9]+$/.test(trimmed)) continue;
+    if (trimmed === '' || /^[^a-zA-Z0-9]+$/.test(trimmed)) continue; // skip icon-only lines
     result.push(trimmed);
   }
   return result.join('\n').trim();
@@ -184,4 +198,5 @@ function fetchEmails(config) {
 }
 
 module.exports = { testConnection, fetchEmails };
+
 
