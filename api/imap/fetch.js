@@ -1,9 +1,9 @@
-const { fetchEmails } = require('../src/utils/imapClient');
-const { validateImapFetch } = require('../src/utils/validators');
+const { fetchEmails } = require('../../src/utils/imapClient');
+const { validateImapFetch } = require('../../src/utils/validators');
 
 module.exports = async (req, res) => {
-  console.log('[fetch-emails] Request received:', new Date().toISOString());
-  console.log('[fetch-emails] Body:', JSON.stringify(req.body));
+  console.log('[fetch] Request received:', new Date().toISOString());
+  console.log('[fetch] Body:', JSON.stringify(req.body));
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  // Map email -> user for compatibility
+  // Map email -> user
   const body = { ...req.body };
   if (!body.user && body.email) {
     body.user = body.email;
@@ -30,9 +30,10 @@ module.exports = async (req, res) => {
 
   try {
     const result = await fetchEmails(body);
+    console.log('[fetch] Result:', result);
     return res.status(200).json(result);
   } catch (err) {
-    console.error('IMAP fetch error:', err);
-    return res.status(500).json({ success: false, error: err.error || 'Internal server error' });
+    console.error('[fetch] Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Internal server error' });
   }
 };
