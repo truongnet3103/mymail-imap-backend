@@ -19,8 +19,8 @@ function validateImapTest(body) {
     errors.push({ field: 'password', message: 'Password is required' });
   }
 
-  if (!body.host || (body.host !== 'localhost' && !isValidHostname(body.host) && !isValidIP(body.host))) {
-    errors.push({ field: 'host', message: 'Valid host (IP or FQDN) is required' });
+  if (!body.host || typeof body.host !== 'string') {
+    errors.push({ field: 'host', message: 'Host is required' });
   }
 
   if (body.port && !isInt(body.port, 1, 65535)) {
