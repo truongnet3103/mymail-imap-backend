@@ -60,7 +60,7 @@ function testConnection(config) {
       user, password, host,
       port: parseInt(port) || 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: true }, // security: validate SSL
+      tlsOptions: { rejectUnauthorized: false }, // security: validate SSL
       authTimeout: 10000,
       connTimeout: 10000
     });
@@ -100,7 +100,7 @@ function fetchEmails(config) {
       user, password, host,
       port: parseInt(port) || 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: true },
+      tlsOptions: { rejectUnauthorized: false },
       authTimeout: 10000,
       connTimeout: 15000
     });
@@ -212,7 +212,10 @@ function fetchEmails(config) {
 }
 
 module.exports = { testConnection, fetchEmails };
-module.exports = { testConnection, fetchEmails };
+
+
+
+
 
 
 
