@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { UserConfig } from '../types';
-import { emailService } from '../services/email.service';
+import admin from '../services/firebase-admin';
 
 const router = Router();
 
@@ -12,7 +12,7 @@ const router = Router();
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const configRef = emailService.getFirestore()
+    const configRef = admin.firestore()
       .collection('user_configs')
       .doc(userId);
 
@@ -65,7 +65,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const configRef = emailService.getFirestore()
+    const configRef = admin.firestore()
       .collection('user_configs')
       .doc(userId);
 
@@ -116,7 +116,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.delete('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const configRef = emailService.getFirestore()
+    const configRef = admin.firestore()
       .collection('user_configs')
       .doc(userId);
 

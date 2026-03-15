@@ -30,7 +30,7 @@ export function initializeFirebaseAdmin() {
 
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
+    databaseURL: `https://${serviceAccount.projectId}.firebaseio.com`
   });
 
   firebaseInitialized = true;
