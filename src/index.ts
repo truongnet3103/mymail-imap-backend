@@ -2,13 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeFirebaseAdmin } from './services/firebase-admin';
-import { authenticateToken } from './middleware/auth';
-import configRoutes from './routes/config';
-import emailRoutes from './routes/emails';
-import threadRoutes from './routes/threads';
 
-// Load .env
+// Load .env FIRST
 dotenv.config();
+
+// Initialize Firebase Admin BEFORE any other imports that use it
+initializeFirebaseAdmin();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,13 +21,16 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize Firebase Admin
-initializeFirebaseAdmin();
-
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Now import routes (Firebase is already initialized)
+import { authenticateToken } from './middleware/auth';
+import configRoutes from './routes/config';
+import emailRoutes from './routes/emails';
+import threadRoutes from './routes/threads';
 
 // API routes (all protected)
 app.use('/api/config', authenticateToken, configRoutes);
