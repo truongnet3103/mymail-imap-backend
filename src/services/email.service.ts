@@ -69,20 +69,33 @@ export class EmailService {
       query = query.where('date', '<=', before);
     }
     if (status !== 'all') {
-      const flag = status === 'unread' ? '\\Seen' : '\\Seen';
-      const containsFlag = status === 'unread' ? 'array_contains' : 'array_contains';
-      query = query[containsFlag]('flags', '\\Seen');
+      if (status === 'unread') {
+        query = query.where('flags', 'array-contains', '\\Seen');
+      } else {
+        // For read, we can't directly query "array does not contain", so we fetch and filter client-side
+        // Or use a separate field like 'isRead' boolean for efficiency
+        // For now, client-side filter only
+      }
     }
 
-    // Get total count
+    // Get total count (Firestore count aggregate)
     const totalSnapshot = await query.count().get();
     const total = totalSnapshot.data().count;
 
     // Get paginated results
     const snapshot = await query.limit(limit).offset(offset).get();
-    const emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CachedEmail[];
+    const emails = snapshot.docs.map(doc => {
+      const data = doc.data() as CachedEmail;
+      return { id: doc.id, ...data };
+    });
 
-    return { emails, total };
+    // If status is 'read', filter client-side (since Firestore can't do "array not contains")
+    let resultEmails = emails;
+    if (status === 'read') {
+      resultEmails = emails.filter(e => e.flags.includes('\\Seen'));
+    }
+
+    return { emails: resultEmails, total };
   }
 
   /**
@@ -108,7 +121,9 @@ export class EmailService {
       throw new Error('Email not found');
     }
 
-    const flags = doc.data().flags;
+    const data = doc.data();
+    const flags = data.flags || [];
+
     if (isRead) {
       // Add \Seen
       if (!flags.includes('\\Seen')) {

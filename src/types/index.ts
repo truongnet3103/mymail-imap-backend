@@ -13,6 +13,7 @@ export interface ImapEmailMetadata {
 
 // Email đã lưu trong Firestore
 export interface CachedEmail {
+  id?: string; // Firestore document ID
   userId: string;
   imapUid: string;
   messageId?: string;
