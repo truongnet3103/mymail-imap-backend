@@ -117,11 +117,15 @@ export class EmailService {
     const emailRef = db.collection('cached_emails').doc(emailId);
     const doc = await emailRef.get();
 
-    if (!doc.exists || doc.data()?.userId !== userId) {
+    if (!doc.exists) {
       throw new Error('Email not found');
     }
 
-    const data = doc.data();
+    const data = doc.data() as CachedEmail;
+    if (data.userId !== userId) {
+      throw new Error('Unauthorized');
+    }
+
     const flags = data.flags || [];
 
     if (isRead) {

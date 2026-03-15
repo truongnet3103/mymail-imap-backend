@@ -59,7 +59,9 @@ export class ThreadService {
       }
 
       const thread = threadMap.get(threadId)!;
-      thread.emailIds.push(email.id);
+      if (email.id) {
+        thread.emailIds.push(email.id);
+      }
       thread.emailCount++;
       if (!email.flags.includes('\\Seen')) {
         thread.unreadCount++;

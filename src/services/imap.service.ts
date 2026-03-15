@@ -1,7 +1,7 @@
 import { ImapFlow, ImapMessage } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { ImapConfig, ImapEmailMetadata, CachedEmail } from '../types';
-import { v4 as uuidv4 } from 'crypto'; // Node crypto for UUID
+import { randomUUID } from 'crypto'; // Node crypto for UUID
 
 export class ImapService {
   private client: ImapFlow;

@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import { emailService } from '../services/email.service';
 import { ImapService } from '../services/imap.service';
 import { UserConfig } from '../types';
+import admin from '../services/firebase-admin';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.post('/fetch', async (req: AuthRequest, res: Response) => {
     const { limit = 100, status = 'all', since, before } = req.query;
 
     // 1. Get IMAP config
-    const configRef = emailService.getFirestore()
+    const configRef = admin.firestore()
       .collection('user_configs')
       .doc(userId);
     const configDoc = await configRef.get();
